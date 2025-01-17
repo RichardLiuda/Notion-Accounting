@@ -20,6 +20,7 @@ fun AccountingScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = Modifier
@@ -44,7 +45,8 @@ fun AccountingScreen(
                     val transactions = (uiState as UiState.Success<List<Transaction>>).data
                     TransactionList(
                         transactions = transactions,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        onDelete = { pageId -> showDeleteConfirmDialog = pageId }
                     )
                 }
                 is UiState.Error -> {
@@ -68,7 +70,7 @@ fun AccountingScreen(
                     .fillMaxWidth()
                     .padding(vertical = 16.dp)
             ) {
-                Text("Add Transaction")
+                Text("添加交易")
             }
         }
     }
@@ -82,25 +84,57 @@ fun AccountingScreen(
             }
         )
     }
+
+    showDeleteConfirmDialog?.let { pageId ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = null },
+            title = { Text("确认删除") },
+            text = { Text("确定要删除这条记录吗？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteTransaction(pageId)
+                        showDeleteConfirmDialog = null
+                    }
+                ) {
+                    Text("删除")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteConfirmDialog = null }
+                ) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun TransactionList(
     transactions: List<Transaction>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDelete: (String) -> Unit = {}
 ) {
     LazyColumn(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(transactions) { transaction ->
-            TransactionItem(transaction = transaction)
+            TransactionItem(
+                transaction = transaction,
+                onDelete = onDelete
+            )
         }
     }
 }
 
 @Composable
-fun TransactionItem(transaction: Transaction) {
+fun TransactionItem(
+    transaction: Transaction,
+    onDelete: (String) -> Unit = {}
+) {
     val dateTimeText = if (transaction.date.isNotEmpty()) {
         val parts = transaction.date.split("T")
         if (parts.size == 2) {
@@ -150,21 +184,34 @@ fun TransactionItem(transaction: Transaction) {
                 }
             }
             
-            Column(
-                horizontalAlignment = Alignment.End
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text(
-                    text = amountText,
-                    color = if (transaction.type == TransactionType.INCOME)
-                        MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.headlineMedium
-                )
-                Text(
-                    text = dateTimeText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = amountText,
+                        color = if (transaction.type == TransactionType.INCOME)
+                            MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                    Text(
+                        text = dateTimeText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                
+                if (transaction.pageId.isNotEmpty()) {
+                    IconButton(
+                        onClick = { onDelete(transaction.pageId) }
+                    ) {
+                        Text("×", style = MaterialTheme.typography.titleLarge)
+                    }
+                }
             }
         }
     }

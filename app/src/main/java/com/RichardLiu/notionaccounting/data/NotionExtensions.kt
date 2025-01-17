@@ -7,12 +7,15 @@ import com.RichardLiu.notionaccounting.model.TransactionCategory
 import timber.log.Timber
 
 data class NotionPage(
+    val id: String? = null,
     val parent: Parent,
-    val properties: Map<String, Property>
+    val properties: Map<String, Property>? = null,
+    val archived: Boolean? = null
 )
 
 data class Parent(
-    val database_id: String
+    val database_id: String,
+    val type: String = "database_id"
 )
 
 data class Property(
@@ -22,12 +25,18 @@ data class Property(
     val number: Double? = null,
     val select: Select? = null,
     val date: DateProperty? = null,
-    val formula: Formula? = null
+    val formula: Formula? = null,
+    val relation: List<Relation>? = null
+)
+
+data class Relation(
+    val id: String
 )
 
 data class Formula(
     val type: String,
-    val date: DateProperty? = null
+    val date: DateProperty? = null,
+    val string: String? = null
 )
 
 data class DateProperty(
@@ -48,37 +57,50 @@ data class Select(
     val name: String
 )
 
+data class SummaryInfo(
+    val month: String,
+    val week: String,
+    val monthPageId: String,
+    val weekPageId: String
+)
+
 fun Transaction.toNotionPage(): NotionPage {
     val databaseId = BuildConfig.NOTION_DATABASE_ID
-    Timber.d("Using database ID: $databaseId")
+    Timber.d("[NOTION_PAGE] Using database ID: $databaseId")
     
     if (databaseId.isBlank()) {
-        Timber.e("Database ID is empty! Please check your local.properties configuration.")
+        Timber.e("[NOTION_ERROR] Database ID is empty! Please check your local.properties configuration.")
     }
     
-    val page = NotionPage(
-        parent = Parent(database_id = databaseId),
-        properties = mapOf(
-            "Reminder" to Property(
-                type = "title",
-                title = listOf(TextContent(Text(content = category.displayName)))
-            ),
-            "Amount" to Property(
-                type = "number",
-                number = amount
-            ),
-            "Tags" to Property(
-                type = "select",
-                select = Select(name = category.notionName)
-            ),
-            "Description" to Property(
-                type = "rich_text",
-                rich_text = listOf(TextContent(Text(content = description)))
-            )
+    val displayText = if (note.isNotEmpty()) {
+        note
+    } else {
+        ""
+    }
+    
+    val properties = mapOf(
+        "Reminder" to Property(
+            type = "title",
+            title = listOf(TextContent(Text(content = displayText)))
+        ),
+        "Amount" to Property(
+            type = "number",
+            number = amount
+        ),
+        "Tags" to Property(
+            type = "select",
+            select = Select(name = category.notionName)
         )
     )
     
-    Timber.d("Created NotionPage: $page")
+    Timber.d("[NOTION_PAGE] Creating page with properties: $properties")
+    
+    val page = NotionPage(
+        parent = Parent(database_id = databaseId),
+        properties = properties
+    )
+    
+    Timber.d("[NOTION_PAGE] Created NotionPage: $page")
     return page
 }
 
@@ -88,26 +110,27 @@ data class NotionResponse(
 
 fun NotionResponse.parseToTransactions(): List<Transaction> {
     return results.map { page ->
-        val tagName = page.properties["Tags"]?.select?.name
+        val tagName = page.properties?.get("Tags")?.select?.name
         val category = TransactionCategory.values().find { it.notionName == tagName }
             ?: TransactionCategory.DAILY
 
-        val description = page.properties["Description"]?.rich_text?.firstOrNull()?.text?.content ?: ""
-        val reminder = page.properties["Reminder"]?.title?.firstOrNull()?.text?.content ?: ""
+        val description = page.properties?.get("Description")?.rich_text?.firstOrNull()?.text?.content ?: ""
+        val reminder = page.properties?.get("Reminder")?.title?.firstOrNull()?.text?.content ?: ""
         val finalDescription = if (description.isNotEmpty()) description else reminder
 
-        val dateProperty = page.properties["Real date"]
+        val dateProperty = page.properties?.get("Real date")
         Timber.d("Date property: $dateProperty")
         val dateValue = dateProperty?.formula?.date?.start
         Timber.d("Date value: $dateValue")
 
         Transaction(
             description = finalDescription,
-            amount = page.properties["Amount"]?.number ?: 0.0,
+            amount = page.properties?.get("Amount")?.number ?: 0.0,
             type = TransactionType.EXPENSE,
             category = category,
             note = "",
-            date = dateValue ?: ""
+            date = dateValue ?: "",
+            pageId = page.id ?: ""
         )
     }
 } 

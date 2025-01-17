@@ -6,5 +6,6 @@ data class Transaction(
     val type: TransactionType,
     val category: TransactionCategory,
     val note: String = "",
-    val date: String = ""
+    val date: String = "",
+    val pageId: String = ""
 ) 

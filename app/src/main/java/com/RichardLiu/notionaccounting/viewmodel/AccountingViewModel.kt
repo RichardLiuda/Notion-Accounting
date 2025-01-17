@@ -56,4 +56,19 @@ class AccountingViewModel @Inject constructor(
             }
         }
     }
+
+    fun deleteTransaction(pageId: String) {
+        Timber.d("Deleting transaction: $pageId")
+        viewModelScope.launch {
+            try {
+                _uiState.value = UiState.Loading
+                repository.deleteTransaction(pageId)
+                Timber.d("Transaction deleted successfully")
+                loadTransactions()
+            } catch (e: Exception) {
+                Timber.e(e, "Error deleting transaction")
+                _uiState.value = UiState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
 } 
