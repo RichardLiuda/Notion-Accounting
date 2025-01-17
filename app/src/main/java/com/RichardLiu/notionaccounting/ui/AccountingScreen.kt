@@ -1,8 +1,17 @@
 package com.RichardLiu.notionaccounting.ui
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,8 +21,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.RichardLiu.notionaccounting.model.Transaction
 import com.RichardLiu.notionaccounting.model.TransactionType
 import com.RichardLiu.notionaccounting.viewmodel.AccountingViewModel
+import kotlinx.coroutines.delay
 import timber.log.Timber
 
+@OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun AccountingScreen(
     viewModel: AccountingViewModel = hiltViewModel()
@@ -21,46 +32,56 @@ fun AccountingScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf<String?>(null) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var currentTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+
+    LaunchedEffect(uiState) {
+        if (uiState is UiState.Success) {
+            currentTransactions = (uiState as UiState.Success<List<Transaction>>).data
+        }
+    }
+
+    LaunchedEffect(isRefreshing) {
+        if (isRefreshing) {
+            delay(300) // 给动画一些时间
+            viewModel.loadTransactions()
+            isRefreshing = false
+        }
+    }
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = { isRefreshing = true }
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .pullRefresh(pullRefreshState)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            when (uiState) {
-                is UiState.Loading -> {
+            Box(
+                modifier = Modifier.weight(1f)
+            ) {
+                if (currentTransactions.isEmpty() && !isRefreshing) {
                     Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
-                }
-                is UiState.Success -> {
-                    val transactions = (uiState as UiState.Success<List<Transaction>>).data
-                    TransactionList(
-                        transactions = transactions,
-                        modifier = Modifier.weight(1f),
-                        onDelete = { pageId -> showDeleteConfirmDialog = pageId }
-                    )
-                }
-                is UiState.Error -> {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
+                        modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = (uiState as UiState.Error).message,
-                            color = MaterialTheme.colorScheme.error
+                            text = "暂无记录",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
+                } else {
+                    TransactionList(
+                        transactions = currentTransactions,
+                        onDelete = { pageId -> showDeleteConfirmDialog = pageId }
+                    )
                 }
             }
 
@@ -73,6 +94,15 @@ fun AccountingScreen(
                 Text("添加交易")
             }
         }
+
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            backgroundColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.primary,
+            scale = true
+        )
     }
 
     if (showDialog) {
@@ -101,9 +131,7 @@ fun AccountingScreen(
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { showDeleteConfirmDialog = null }
-                ) {
+                TextButton(onClick = { showDeleteConfirmDialog = null }) {
                     Text("取消")
                 }
             }
@@ -111,6 +139,7 @@ fun AccountingScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionList(
     transactions: List<Transaction>,
@@ -121,95 +150,142 @@ fun TransactionList(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(transactions) { transaction ->
+        items(
+            items = transactions,
+            key = { it.pageId.ifEmpty { it.hashCode().toString() } }
+        ) { transaction ->
             TransactionItem(
                 transaction = transaction,
-                onDelete = onDelete
+                onDelete = onDelete,
+                modifier = Modifier
+                    .animateItemPlacement(
+                        animationSpec = tween(
+                            durationMillis = 500,
+                            easing = LinearOutSlowInEasing
+                        )
+                    )
             )
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionItem(
     transaction: Transaction,
-    onDelete: (String) -> Unit = {}
+    onDelete: (String) -> Unit = {},
+    modifier: Modifier = Modifier
 ) {
-    val dateTimeText = if (transaction.date.isNotEmpty()) {
-        val parts = transaction.date.split("T")
-        if (parts.size == 2) {
-            val date = parts[0]
-            val time = parts[1].substringBefore(".")  // 移除毫秒部分
-            "$date ${time.substring(0, 5)}"  // 只显示小时和分钟
-        } else {
-            transaction.date
-        }
-    } else {
-        "No date"
-    }
+    var isVisible by remember { mutableStateOf(false) }
     
-    val amountText = if (transaction.type == TransactionType.INCOME) 
-        "+${String.format("%.2f", transaction.amount)}" 
-    else 
-        "-${String.format("%.2f", transaction.amount)}"
+    LaunchedEffect(Unit) {
+        delay(150) // 给每个项目一个小延迟
+        isVisible = true
+    }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = fadeIn(
+            animationSpec = tween(
+                durationMillis = 500,
+                easing = LinearOutSlowInEasing
+            )
+        ) + slideInHorizontally(
+            animationSpec = tween(
+                durationMillis = 500,
+                easing = LinearOutSlowInEasing
+            ),
+            initialOffsetX = { -it }  // 从左边滑入
+        ),
+        exit = fadeOut(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = LinearOutSlowInEasing
+            )
+        ) + slideOutHorizontally(
+            animationSpec = tween(
+                durationMillis = 300,
+                easing = LinearOutSlowInEasing
+            ),
+            targetOffsetX = { -it }  // 向左边滑出
+        )
     ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        ElevatedCard(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = transaction.category.displayName,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    if (transaction.description.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
                         Text(
-                            text = transaction.description,
+                            text = transaction.category.displayName,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        if (transaction.description.isNotEmpty()) {
+                            Text(
+                                text = transaction.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = if (transaction.type == TransactionType.INCOME) 
+                                "+${String.format("%.2f", transaction.amount)}" 
+                            else 
+                                "-${String.format("%.2f", transaction.amount)}",
+                            color = if (transaction.type == TransactionType.INCOME)
+                                MaterialTheme.colorScheme.primary
+                            else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = if (transaction.date.isNotEmpty()) {
+                                val parts = transaction.date.split("T")
+                                if (parts.size == 2) {
+                                    val date = parts[0]
+                                    val time = parts[1].substringBefore(".")
+                                    "$date ${time.substring(0, 5)}"
+                                } else {
+                                    transaction.date
+                                }
+                            } else {
+                                "No date"
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                }
-            }
-            
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    Text(
-                        text = amountText,
-                        color = if (transaction.type == TransactionType.INCOME)
-                            MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                    Text(
-                        text = dateTimeText,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                if (transaction.pageId.isNotEmpty()) {
-                    IconButton(
-                        onClick = { onDelete(transaction.pageId) }
-                    ) {
-                        Text("×", style = MaterialTheme.typography.titleLarge)
+                    
+                    if (transaction.pageId.isNotEmpty()) {
+                        IconButton(
+                            onClick = { onDelete(transaction.pageId) }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "删除",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

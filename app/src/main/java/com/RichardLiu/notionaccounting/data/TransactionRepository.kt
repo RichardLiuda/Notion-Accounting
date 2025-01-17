@@ -10,16 +10,14 @@ import java.net.SocketTimeoutException
 import javax.inject.Inject
 
 class TransactionRepository @Inject constructor(
-    private val notionService: NotionService
+    private val notionService: NotionService,
+    private val settings: Settings
 ) {
-    private val databaseId = BuildConfig.NOTION_DATABASE_ID
-    private val monthSummaryDatabaseId = "11869776e204809b845ed62a1ad79276"
-    private val weekSummaryDatabaseId = "11769776e20481c39130d3417ad5d13c"
     private val maxRetries = 3
     private val initialRetryDelay = 1000L // 1 second
 
     init {
-        Timber.d("TransactionRepository initialized with database ID: $databaseId")
+        Timber.d("TransactionRepository initialized with database IDs: main=${settings.databaseId}, month=${settings.monthSummaryDatabaseId}, week=${settings.weekSummaryDatabaseId}")
     }
 
     private suspend fun <T> retryOnTimeout(
@@ -130,13 +128,13 @@ class TransactionRepository @Inject constructor(
             Timber.d("[NOTION_ADD] Got Month: $month, Week: $week")
 
             // 查找或创建月度和周度总结页面
-            val monthPageId = findOrCreateSummaryPage(monthSummaryDatabaseId, "Month", month)
-            val weekPageId = findOrCreateSummaryPage(weekSummaryDatabaseId, "Week", week)
+            val monthPageId = findOrCreateSummaryPage(settings.monthSummaryDatabaseId, "Month", month)
+            val weekPageId = findOrCreateSummaryPage(settings.weekSummaryDatabaseId, "Week", week)
 
             // 更新交易记录，添加关联
             val updatedPage = NotionPage(
                 id = transactionPage.body()!!.id,
-                parent = Parent(database_id = databaseId),
+                parent = Parent(database_id = settings.databaseId),
                 properties = mapOf(
                     "月度总结" to Property(
                         type = "relation",
@@ -174,7 +172,7 @@ class TransactionRepository @Inject constructor(
             )
             
             val response = retryOnTimeout {
-                notionService.getTransactions(databaseId, query)
+                notionService.getTransactions(settings.databaseId, query)
             }
             if (response.isSuccessful) {
                 val transactions = response.body()?.parseToTransactions() ?: emptyList()
@@ -197,7 +195,7 @@ class TransactionRepository @Inject constructor(
                 notionService.deletePage(
                     pageId = pageId,
                     page = NotionPage(
-                        parent = Parent(database_id = databaseId),
+                        parent = Parent(database_id = settings.databaseId),
                         properties = emptyMap(),
                         archived = true
                     )

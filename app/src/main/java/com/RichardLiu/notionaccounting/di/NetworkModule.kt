@@ -2,6 +2,7 @@ package com.RichardLiu.notionaccounting.di
 
 import com.RichardLiu.notionaccounting.BuildConfig
 import com.RichardLiu.notionaccounting.data.NotionService
+import com.RichardLiu.notionaccounting.data.Settings
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,8 +22,8 @@ object NetworkModule {
     
     @Provides
     @Singleton
-    fun provideAuthInterceptor() = Interceptor { chain ->
-        val token = BuildConfig.NOTION_API_KEY
+    fun provideAuthInterceptor(settings: Settings) = Interceptor { chain ->
+        val token = settings.apiKey
         Timber.d("Using API Key: ${token.take(10)}...")
         
         val request = chain.request().newBuilder()

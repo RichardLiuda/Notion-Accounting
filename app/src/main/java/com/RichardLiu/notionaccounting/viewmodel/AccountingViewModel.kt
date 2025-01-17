@@ -26,7 +26,7 @@ class AccountingViewModel @Inject constructor(
         loadTransactions()
     }
 
-    private fun loadTransactions() {
+    fun loadTransactions() {
         Timber.d("Loading transactions...")
         viewModelScope.launch {
             _uiState.value = UiState.Loading

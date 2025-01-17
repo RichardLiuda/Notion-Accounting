@@ -27,9 +27,13 @@ android {
         
         def notionApiKey = properties.getProperty('NOTION_API_KEY', '')
         def notionDatabaseId = properties.getProperty('NOTION_DATABASE_ID', '')
+        def notionMonthSummaryDatabaseId = properties.getProperty('NOTION_MONTH_SUMMARY_DATABASE_ID', '')
+        def notionWeekSummaryDatabaseId = properties.getProperty('NOTION_WEEK_SUMMARY_DATABASE_ID', '')
 
         buildConfigField "String", "NOTION_API_KEY", "\"${notionApiKey}\""
         buildConfigField "String", "NOTION_DATABASE_ID", "\"${notionDatabaseId}\""
+        buildConfigField "String", "NOTION_MONTH_SUMMARY_DATABASE_ID", "\"${notionMonthSummaryDatabaseId}\""
+        buildConfigField "String", "NOTION_WEEK_SUMMARY_DATABASE_ID", "\"${notionWeekSummaryDatabaseId}\""
     }
 
     buildTypes {
@@ -103,4 +107,7 @@ dependencies {
     androidTestImplementation 'androidx.compose.ui:ui-test-junit4'
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
+
+    implementation "androidx.compose.material3:material3:1.2.0"
+    implementation "androidx.compose.material:material:1.6.3"
 } 
