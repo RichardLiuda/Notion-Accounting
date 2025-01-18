@@ -3,26 +3,39 @@ package com.RichardLiu.notionaccounting.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.SwipeToDismiss
+import androidx.compose.material.DismissValue
+import androidx.compose.material.DismissDirection
+import androidx.compose.material.rememberDismissState
+import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
+import androidx.compose.material.swipeable
+import androidx.compose.material.rememberSwipeableState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.foundation.gestures.Orientation
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.RichardLiu.notionaccounting.model.Transaction
 import com.RichardLiu.notionaccounting.model.TransactionType
 import com.RichardLiu.notionaccounting.viewmodel.AccountingViewModel
 import kotlinx.coroutines.delay
 import timber.log.Timber
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -169,7 +182,7 @@ fun TransactionList(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun TransactionItem(
     transaction: Transaction,
@@ -179,7 +192,7 @@ fun TransactionItem(
     var isVisible by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
-        delay(150) // 给每个项目一个小延迟
+        delay(150)
         isVisible = true
     }
 
@@ -195,7 +208,7 @@ fun TransactionItem(
                 durationMillis = 500,
                 easing = LinearOutSlowInEasing
             ),
-            initialOffsetX = { -it }  // 从左边滑入
+            initialOffsetX = { -it }
         ),
         exit = fadeOut(
             animationSpec = tween(
@@ -207,26 +220,70 @@ fun TransactionItem(
                 durationMillis = 300,
                 easing = LinearOutSlowInEasing
             ),
-            targetOffsetX = { -it }  // 向左边滑出
+            targetOffsetX = { -it }
         )
     ) {
-        ElevatedCard(
+        val deleteButtonWidth = 120.dp
+        val swipeableState = rememberSwipeableState(initialValue = 0)
+        val density = LocalDensity.current
+        val anchors = with(density) {
+            mapOf(
+                0f to 0,
+                -deleteButtonWidth.toPx() to 1
+            )
+        }
+
+        Box(
             modifier = modifier
-                .fillMaxWidth()
                 .padding(vertical = 4.dp)
         ) {
-            Row(
+            // 删除按钮
+            Box(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 16.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = { onDelete(transaction.pageId) },
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ),
+                    modifier = Modifier
+                        .width(deleteButtonWidth - 32.dp)
+                        .height(40.dp)
+                ) {
+                    Text("删除")
+                }
+            }
+
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .offset { IntOffset(swipeableState.offset.value.roundToInt(), 0) }
+                    .swipeable(
+                        state = swipeableState,
+                        anchors = anchors,
+                        thresholds = { _, _ -> FractionalThreshold(0.3f) },
+                        orientation = Orientation.Horizontal
+                    ),
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.elevatedCardElevation(
+                    defaultElevation = 1.dp
+                )
             ) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = transaction.category.displayName,
                             style = MaterialTheme.typography.titleMedium
@@ -239,14 +296,10 @@ fun TransactionItem(
                             )
                         }
                     }
-                }
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                    
                     Column(
-                        horizontalAlignment = Alignment.End
+                        horizontalAlignment = Alignment.End,
+                        modifier = Modifier.padding(start = 16.dp)
                     ) {
                         Text(
                             text = if (transaction.type == TransactionType.INCOME) 
@@ -274,18 +327,6 @@ fun TransactionItem(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                    
-                    if (transaction.pageId.isNotEmpty()) {
-                        IconButton(
-                            onClick = { onDelete(transaction.pageId) }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "删除",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
             }
