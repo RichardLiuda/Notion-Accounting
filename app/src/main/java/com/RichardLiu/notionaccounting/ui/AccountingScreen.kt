@@ -14,7 +14,9 @@ import androidx.compose.material.DismissDirection
 import androidx.compose.material.rememberDismissState
 import androidx.compose.material.FractionalThreshold
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
@@ -56,7 +58,7 @@ fun AccountingScreen(
 
     LaunchedEffect(isRefreshing) {
         if (isRefreshing) {
-            delay(300) // 给动画一些时间
+            delay(300)
             viewModel.loadTransactions()
             isRefreshing = false
         }
@@ -67,55 +69,64 @@ fun AccountingScreen(
         onRefresh = { isRefreshing = true }
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .pullRefresh(pullRefreshState)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(
-                modifier = Modifier.weight(1f)
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showDialog = true },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
             ) {
-                if (currentTransactions.isEmpty() && !isRefreshing) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "添加交易"
+                )
+            }
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .pullRefresh(pullRefreshState)
+        ) {
+            if (currentTransactions.isEmpty() && !isRefreshing) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.List,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                         Text(
                             text = "暂无记录",
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                } else {
-                    TransactionList(
-                        transactions = currentTransactions,
-                        onDelete = { pageId -> showDeleteConfirmDialog = pageId }
-                    )
                 }
+            } else {
+                TransactionList(
+                    transactions = currentTransactions,
+                    onDelete = { pageId -> showDeleteConfirmDialog = pageId }
+                )
             }
 
-            Button(
-                onClick = { showDialog = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp)
-            ) {
-                Text("添加交易")
-            }
+            PullRefreshIndicator(
+                refreshing = isRefreshing,
+                state = pullRefreshState,
+                modifier = Modifier.align(Alignment.TopCenter),
+                backgroundColor = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.primary,
+                scale = true
+            )
         }
-
-        PullRefreshIndicator(
-            refreshing = isRefreshing,
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter),
-            backgroundColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.primary,
-            scale = true
-        )
     }
 
     if (showDialog) {
@@ -131,6 +142,7 @@ fun AccountingScreen(
     showDeleteConfirmDialog?.let { pageId ->
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = null },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null) },
             title = { Text("确认删除") },
             text = { Text("确定要删除这条记录吗？") },
             confirmButton = {
@@ -138,7 +150,10 @@ fun AccountingScreen(
                     onClick = {
                         viewModel.deleteTransaction(pageId)
                         showDeleteConfirmDialog = null
-                    }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
                 ) {
                     Text("删除")
                 }
@@ -160,7 +175,7 @@ fun TransactionList(
     onDelete: (String) -> Unit = {}
 ) {
     LazyColumn(
-        modifier = modifier,
+        modifier = modifier.padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(
