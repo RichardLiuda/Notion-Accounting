@@ -47,10 +47,9 @@ class TransactionRepository @Inject constructor(
         val query = QueryRequest(
             filter = Filter(
                 property = propertyName,
-                rich_text = TextFilter(contains = propertyValue)
+                title = TitleFilter(equals = propertyValue)
             ),
-            page_size = 1,
-            sorts = null  // 明确指定不需要排序
+            page_size = 1
         )
 
         val response = retryOnTimeout {

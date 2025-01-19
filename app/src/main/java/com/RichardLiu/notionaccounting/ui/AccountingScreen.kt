@@ -45,125 +45,104 @@ fun AccountingScreen(
     viewModel: AccountingViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showDialog by remember { mutableStateOf(false) }
-    var showDeleteConfirmDialog by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
-    var currentTransactions by remember { mutableStateOf<List<Transaction>>(emptyList()) }
+
+    val pullRefreshState = rememberPullRefreshState(
+        refreshing = isRefreshing,
+        onRefresh = {
+            isRefreshing = true
+            viewModel.loadTransactions()
+        }
+    )
 
     LaunchedEffect(uiState) {
-        if (uiState is UiState.Success) {
-            currentTransactions = (uiState as UiState.Success<List<Transaction>>).data
-        }
-    }
-
-    LaunchedEffect(isRefreshing) {
-        if (isRefreshing) {
-            delay(300)
-            viewModel.loadTransactions()
+        if (uiState !is UiState.Loading) {
             isRefreshing = false
         }
     }
 
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = { isRefreshing = true }
-    )
-
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showDialog = true },
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "添加交易"
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .pullRefresh(pullRefreshState)
+    ) {
+        when (uiState) {
+            is UiState.Loading -> {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
                 )
             }
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .pullRefresh(pullRefreshState)
-        ) {
-            if (currentTransactions.isEmpty() && !isRefreshing) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
+            is UiState.Success -> {
+                val transactions = (uiState as UiState.Success<List<Transaction>>).data
+                if (transactions.isEmpty()) {
                     Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.List,
                             contentDescription = null,
                             modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "暂无记录",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
+                } else {
+                    TransactionList(
+                        transactions = transactions,
+                        onDelete = { pageId -> showDeleteConfirm = pageId }
+                    )
                 }
-            } else {
-                TransactionList(
-                    transactions = currentTransactions,
-                    onDelete = { pageId -> showDeleteConfirmDialog = pageId }
+            }
+            is UiState.Error -> {
+                Text(
+                    text = (uiState as UiState.Error).message,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(16.dp)
                 )
             }
+        }
 
-            PullRefreshIndicator(
-                refreshing = isRefreshing,
-                state = pullRefreshState,
-                modifier = Modifier.align(Alignment.TopCenter),
-                backgroundColor = MaterialTheme.colorScheme.surface,
-                contentColor = MaterialTheme.colorScheme.primary,
-                scale = true
+        PullRefreshIndicator(
+            refreshing = isRefreshing,
+            state = pullRefreshState,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        if (showDeleteConfirm != null) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = null },
+                title = { Text("确认删除") },
+                text = { Text("确定要删除这条记录吗？") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showDeleteConfirm?.let { pageId ->
+                                viewModel.deleteTransaction(pageId)
+                            }
+                            showDeleteConfirm = null
+                        }
+                    ) {
+                        Text("删除")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = null }) {
+                        Text("取消")
+                    }
+                }
             )
         }
-    }
-
-    if (showDialog) {
-        AddTransactionDialog(
-            onDismiss = { showDialog = false },
-            onConfirm = { transaction ->
-                viewModel.addTransaction(transaction)
-                showDialog = false
-            }
-        )
-    }
-
-    showDeleteConfirmDialog?.let { pageId ->
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmDialog = null },
-            icon = { Icon(Icons.Default.Delete, contentDescription = null) },
-            title = { Text("确认删除") },
-            text = { Text("确定要删除这条记录吗？") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.deleteTransaction(pageId)
-                        showDeleteConfirmDialog = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) {
-                    Text("删除")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirmDialog = null }) {
-                    Text("取消")
-                }
-            }
-        )
     }
 }
 

@@ -25,23 +25,19 @@ data class Property(
     val number: Double? = null,
     val select: Select? = null,
     val date: DateProperty? = null,
-    val formula: Formula? = null,
-    val relation: List<Relation>? = null
+    val formula: FormulaValue? = null,
+    val relation: List<Relation>? = null,
+    val rollup: Rollup? = null
 )
 
 data class Relation(
     val id: String
 )
 
-data class Formula(
-    val type: String,
-    val date: DateProperty? = null,
-    val string: String? = null
-)
-
 data class DateProperty(
-    val start: String?,
+    val start: String? = null,
     val end: String? = null,
+    val equals: String? = null,
     val time_zone: String? = null
 )
 
@@ -103,10 +99,6 @@ fun Transaction.toNotionPage(): NotionPage {
     Timber.d("[NOTION_PAGE] Created NotionPage: $page")
     return page
 }
-
-data class NotionResponse(
-    val results: List<NotionPage>
-)
 
 fun NotionResponse.parseToTransactions(): List<Transaction> {
     return results.map { page ->
