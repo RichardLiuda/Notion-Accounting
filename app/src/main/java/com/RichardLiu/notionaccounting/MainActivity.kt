@@ -3,18 +3,20 @@ package com.RichardLiu.notionaccounting
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
-import androidx.navigation.compose.*
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.RichardLiu.notionaccounting.ui.AccountingScreen
 import com.RichardLiu.notionaccounting.ui.AddTransactionScreen
 import com.RichardLiu.notionaccounting.ui.SettingsScreen
@@ -24,53 +26,52 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    sealed class Screen(val route: String, val icon: ImageVector, val label: String) {
-        object AddTransaction : Screen("add_transaction", Icons.Default.Add, "添加")
-        object Statistics : Screen("statistics", Icons.Default.Info, "统计")
-        object Accounting : Screen("accounting", Icons.Default.List, "记录")
-        object Settings : Screen("settings", Icons.Default.Settings, "设置")
-
-        companion object {
-            val items = listOf(AddTransaction, Statistics, Accounting, Settings)
-            
-            fun fromRoute(route: String?): Screen? = when(route) {
-                AddTransaction.route -> AddTransaction
-                Statistics.route -> Statistics
-                Accounting.route -> Accounting
-                Settings.route -> Settings
-                else -> null
-            }
-        }
-    }
-
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             NotionAccountingTheme {
                 val navController = rememberNavController()
-                val currentBackStack by navController.currentBackStackEntryAsState()
-                val currentScreen = Screen.fromRoute(currentBackStack?.destination?.route)
+                val items = listOf(
+                    Screen.Add,
+                    Screen.Statistics,
+                    Screen.Transactions,
+                    Screen.Settings
+                )
+                val navBackStackEntry by navController.currentBackStackEntryAsState()
+                val currentRoute = navBackStackEntry?.destination?.route
 
                 Scaffold(
                     topBar = {
-                        LargeTopAppBar(
-                            title = { Text(text = when(currentScreen) {
-                                Screen.AddTransaction -> "添加交易"
-                                Screen.Statistics -> "统计"
-                                Screen.Accounting -> "交易记录"
-                                Screen.Settings -> "设置"
-                                null -> "Notion记账"
-                            }) }
+                        TopAppBar(
+                            title = {
+                                Text(
+                                    when (currentRoute) {
+                                        Screen.Add.route -> "添加交易"
+                                        Screen.Statistics.route -> "统计"
+                                        Screen.Transactions.route -> "交易记录"
+                                        Screen.Settings.route -> "设置"
+                                        else -> "Notion记账"
+                                    },
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                titleContentColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            modifier = Modifier.padding(top = 8.dp)
                         )
                     },
                     bottomBar = {
                         NavigationBar {
-                            Screen.items.forEach { screen ->
+                            val currentDestination = navBackStackEntry?.destination
+                            items.forEach { screen ->
                                 NavigationBarItem(
                                     icon = { Icon(screen.icon, contentDescription = null) },
                                     label = { Text(screen.label) },
-                                    selected = currentScreen == screen,
+                                    selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
                                     onClick = {
                                         navController.navigate(screen.route) {
                                             popUpTo(navController.graph.findStartDestination().id) {
@@ -84,27 +85,30 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     }
-                ) { paddingValues ->
+                ) { innerPadding ->
                     NavHost(
                         navController = navController,
-                        startDestination = Screen.Accounting.route,
-                        modifier = Modifier.padding(paddingValues)
+                        startDestination = Screen.Add.route,
+                        modifier = Modifier.padding(innerPadding)
                     ) {
-                        composable(Screen.AddTransaction.route) {
-                            AddTransactionScreen()
-                        }
-                        composable(Screen.Statistics.route) {
-                            StatisticsScreen()
-                        }
-                        composable(Screen.Accounting.route) {
-                            AccountingScreen()
-                        }
-                        composable(Screen.Settings.route) {
-                            SettingsScreen()
-                        }
+                        composable(Screen.Add.route) { AddTransactionScreen() }
+                        composable(Screen.Statistics.route) { StatisticsScreen() }
+                        composable(Screen.Transactions.route) { AccountingScreen() }
+                        composable(Screen.Settings.route) { SettingsScreen() }
                     }
                 }
             }
         }
     }
+}
+
+sealed class Screen(
+    val route: String,
+    val label: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    object Add : Screen("add", "添加", Icons.Default.Add)
+    object Statistics : Screen("statistics", "统计", Icons.Default.Info)
+    object Transactions : Screen("transactions", "记录", Icons.Default.List)
+    object Settings : Screen("settings", "设置", Icons.Default.Settings)
 } 

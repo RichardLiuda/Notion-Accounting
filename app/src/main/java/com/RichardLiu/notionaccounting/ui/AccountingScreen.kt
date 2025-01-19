@@ -36,6 +36,7 @@ import com.RichardLiu.notionaccounting.model.Transaction
 import com.RichardLiu.notionaccounting.model.TransactionType
 import com.RichardLiu.notionaccounting.viewmodel.AccountingViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
 import kotlin.math.roundToInt
 
@@ -47,14 +48,24 @@ fun AccountingScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showDeleteConfirm by remember { mutableStateOf<String?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var showIndicator by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
+        refreshing = false,
         onRefresh = {
-            isRefreshing = true
-            viewModel.loadTransactions()
-        }
+            scope.launch {
+                isRefreshing = true
+                viewModel.loadTransactions()
+            }
+        },
+        refreshThreshold = 100.dp,
+        refreshingOffset = 56.dp
     )
+
+    LaunchedEffect(pullRefreshState.progress) {
+        showIndicator = pullRefreshState.progress > 0
+    }
 
     LaunchedEffect(uiState) {
         if (uiState !is UiState.Loading) {
@@ -113,11 +124,32 @@ fun AccountingScreen(
             }
         }
 
-        PullRefreshIndicator(
-            refreshing = isRefreshing,
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+        ) {
+            AnimatedVisibility(
+                visible = showIndicator,
+                enter = fadeIn(),
+                exit = fadeOut(
+                    animationSpec = tween(
+                        durationMillis = 300,
+                        easing = LinearOutSlowInEasing
+                    )
+                ),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                PullRefreshIndicator(
+                    refreshing = false,
+                    state = pullRefreshState,
+                    modifier = Modifier,
+                    backgroundColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    scale = true
+                )
+            }
+        }
 
         if (showDeleteConfirm != null) {
             AlertDialog(
@@ -231,7 +263,6 @@ fun TransactionItem(
             modifier = modifier
                 .padding(vertical = 4.dp)
         ) {
-            // 删除按钮
             Box(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
