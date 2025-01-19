@@ -1,4 +1,4 @@
-# Notion 记账 App
+# Notion Accounting App
 
 一个基于 Notion API 的 Android 记账应用，可以将你的收支记录同步到 Notion 数据库中。
 

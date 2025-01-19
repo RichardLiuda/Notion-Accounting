@@ -68,16 +68,10 @@ fun Transaction.toNotionPage(): NotionPage {
         Timber.e("[NOTION_ERROR] Database ID is empty! Please check your local.properties configuration.")
     }
     
-    val displayText = if (note.isNotEmpty()) {
-        note
-    } else {
-        ""
-    }
-    
     val properties = mapOf(
         "Reminder" to Property(
             type = "title",
-            title = listOf(TextContent(Text(content = displayText)))
+            title = listOf(TextContent(Text(content = description)))
         ),
         "Amount" to Property(
             type = "number",
