@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -109,6 +110,6 @@ sealed class Screen(
 ) {
     object Add : Screen("add", "添加", Icons.Default.Add)
     object Statistics : Screen("statistics", "统计", Icons.Default.Info)
-    object Transactions : Screen("transactions", "记录", Icons.Default.List)
+    object Transactions : Screen("transactions", "记录", Icons.AutoMirrored.Filled.List)
     object Settings : Screen("settings", "设置", Icons.Default.Settings)
 } 

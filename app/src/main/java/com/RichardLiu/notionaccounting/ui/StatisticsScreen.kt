@@ -32,6 +32,9 @@ import com.patrykandpatrick.vico.compose.chart.line.lineChart
 import com.patrykandpatrick.vico.compose.style.ProvideChartStyle
 import com.patrykandpatrick.vico.core.entry.entryModelOf
 import com.patrykandpatrick.vico.core.entry.FloatEntry
+import com.patrykandpatrick.vico.core.axis.AxisPosition
+import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
+import com.patrykandpatrick.vico.core.entry.ChartEntry
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -185,12 +188,11 @@ fun StatisticsScreen(
                                         bottomAxis = bottomAxis(
                                             valueFormatter = { value, _ ->
                                                 val entry = chartEntries.getOrNull(value.toInt())
-                                                if (entry != null) {
-                                                    val date = data.dailyExpensesMap.entries
+                                                entry?.let {
+                                                    data.dailyExpensesMap.entries
                                                         .sortedBy { it.key }
-                                                        .getOrNull(value.toInt())?.key
-                                                    date?.dayOfMonth?.toString() ?: ""
-                                                } else ""
+                                                        .getOrNull(value.toInt())?.key?.dayOfMonth?.toString()
+                                                } ?: ""
                                             }
                                         ),
                                         modifier = Modifier
